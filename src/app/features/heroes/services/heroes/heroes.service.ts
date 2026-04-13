@@ -4,7 +4,7 @@ import { CreateHeroDto, Hero, UpdateHeroDto } from '../../models/hero.model';
 const INITIAL_HEROES: Hero[] = [
   {
     id: '1',
-    name: 'Superman',
+    name: 'SUPERMAN',
     alias: 'Clark Kent',
     power: 'Vuelo, super fuerza, visión de rayos X',
     universe: 'DC',
@@ -12,7 +12,7 @@ const INITIAL_HEROES: Hero[] = [
   },
   {
     id: '2',
-    name: 'Spiderman',
+    name: 'SPIDERMAN',
     alias: 'Peter Parker',
     power: 'Sentido arácnido, trepar paredes, telarañas',
     universe: 'Marvel',
@@ -20,7 +20,7 @@ const INITIAL_HEROES: Hero[] = [
   },
   {
     id: '3',
-    name: 'Batman',
+    name: 'BATMAN',
     alias: 'Bruce Wayne',
     power: 'Inteligencia, artes marciales, tecnología',
     universe: 'DC',
@@ -28,7 +28,7 @@ const INITIAL_HEROES: Hero[] = [
   },
   {
     id: '4',
-    name: 'Ironman',
+    name: 'IRONMAN',
     alias: 'Tony Stark',
     power: 'Armadura tecnológica, inteligencia',
     universe: 'Marvel',
@@ -36,20 +36,12 @@ const INITIAL_HEROES: Hero[] = [
   },
   {
     id: '5',
-    name: 'Wonder Woman',
+    name: 'WONDER WOMAN',
     alias: 'Diana Prince',
     power: 'Super fuerza, lazo de la verdad, vuelo',
     universe: 'DC',
     createdAt: new Date('2000-01-05'),
-  },
-  {
-    id: '6',
-    name: 'Manolito el fuerte',
-    alias: 'Manolito García',
-    power: 'Fuerza descomunal, resistencia',
-    universe: 'Other',
-    createdAt: new Date('2000-01-06'),
-  },
+  }
 ];
 
 @Injectable({ providedIn: 'root' })

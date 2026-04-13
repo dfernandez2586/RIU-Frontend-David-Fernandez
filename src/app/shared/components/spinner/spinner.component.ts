@@ -7,13 +7,28 @@ import { LoadingService } from '../../../features/heroes/services/loading/loadin
   standalone: true,
   imports: [MatProgressSpinnerModule],
   template: `
-    @if (loadingService.loading()) {
-      <div class="loading-overlay" role="status" aria-label="Cargando...">
-        <mat-spinner diameter="56" />
+    @if (loading()) {
+      <div class="overlay">
+        <mat-spinner />
       </div>
     }
   `,
+  styles: [
+    `
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+    `,
+  ],
 })
 export class SpinnerComponent {
-  readonly loadingService = inject(LoadingService);
+  private readonly loadingService = inject(LoadingService);
+
+  readonly loading = this.loadingService.loading;
 }

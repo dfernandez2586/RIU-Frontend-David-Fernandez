@@ -1,29 +1,15 @@
 @use '@angular/material' as mat;
 
-html,
-body {
-  height: 100%;
-  margin: 0;
-  font-family: Roboto, 'Helvetica Neue', sans-serif;
-}
+@include mat.core();
 
-.app-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px 16px;
-}
+$theme: mat.define-theme((
+  color: (
+    theme-type: light,
+    primary: mat.$blue-palette,
+    tertiary: mat.$violet-palette,
+  ),
+));
 
-.spacer {
-  flex: 1 1 auto;
-}
-
-/* Spinner overlay */
-.loading-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.32);
-  z-index: 9999;
+:root {
+  @include mat.all-component-themes($theme);
 }

@@ -5,6 +5,10 @@ import { LoadingService } from '../../features/heroes/services/loading/loading.s
 
 export const loadingInterceptor: HttpInterceptorFn = (req, next) => {
   const loadingService = inject(LoadingService);
+
   loadingService.show();
-  return next(req).pipe(finalize(() => loadingService.hide()));
+
+  return next(req).pipe(
+    finalize(() => loadingService.hide())
+  );
 };

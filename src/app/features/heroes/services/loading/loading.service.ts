@@ -1,15 +1,16 @@
-import { Injectable, signal } from '@angular/core';
- 
+import { Injectable, signal, computed } from '@angular/core';
+
 @Injectable({ providedIn: 'root' })
 export class LoadingService {
-  private readonly _loading = signal(false);
-  readonly loading = this._loading.asReadonly();
- 
+  private readonly _requests = signal(0);
+
+  readonly loading = computed(() => this._requests() > 0);
+
   show(): void {
-    this._loading.set(true);
+    this._requests.update((value) => value + 1);
   }
- 
+
   hide(): void {
-    this._loading.set(false);
+    this._requests.update((value) => Math.max(0, value - 1));
   }
 }

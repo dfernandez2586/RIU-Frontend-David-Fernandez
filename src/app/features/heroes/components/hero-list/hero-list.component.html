@@ -1,0 +1,45 @@
+    <!-- Toolbar: filter + add button -->
+    <div class="list-header">
+      <mat-form-field appearance="outline" class="filter-field">
+        <mat-label>Buscar héroe</mat-label>
+        <input matInput [formControl]="filterControl" placeholder="ej. man" />
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+
+      <button mat-raised-button color="primary" (click)="navigateToNew()">
+        <mat-icon>add</mat-icon>
+        Nuevo héroe
+      </button>
+    </div>
+
+    <!-- Empty state -->
+    @if (pagedHeroes().length === 0) {
+      <div class="empty-state">
+        <mat-icon>search_off</mat-icon>
+        <p>No se encontraron héroes.</p>
+      </div>
+    }
+
+    <!-- Grid of cards -->
+    <div class="hero-grid">
+      @for (hero of pagedHeroes(); track hero.id) {
+        <app-hero-card
+          [hero]="hero"
+          (editClicked)="navigateToEdit($event)"
+          (deleteClicked)="openDeleteDialog($event)"
+        />
+      }
+    </div>
+
+    <!-- Paginator -->
+    @if (filteredHeroes().length > 0) {
+      <mat-paginator
+        [length]="filteredHeroes().length"
+        [pageSize]="pageSize"
+        [pageIndex]="pageIndex()"
+        [pageSizeOptions]="[3, 6, 12]"
+        (page)="onPageChange($event)"
+        showFirstLastButtons
+        aria-label="Páginas de héroes"
+      />
+    }
