@@ -6,12 +6,6 @@
 
 ## Instalación y desarrollo
 
-Clona el repositorio:
-
-```bash
-git clone https://github.com/tu-usuario/super-heroes-fe.git
-```
-
 ```bash
 npm install
 npm start          # http://localhost:4200
