@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Observable, of, throwError, Subject } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import { HeroesService } from './heroes.service';
@@ -94,18 +94,12 @@ describe('HeroesService', () => {
   });
 
   it('loadAll() should set error state on failure', () => {
-    // Subject controlado: emitimos el error DESPUÉS de suscribir
-    // para que el error handler corra último, sin finalize sobreescribiendo
     const subject = new Subject<Hero[]>();
     repoSpy.getAll.mockReturnValue(subject.asObservable());
 
     service.loadAll();
-
-    // Verificamos que durante la carga el estado es 'loading'
     expect(service.listState()).toBe('loading');
 
-    // Emitimos el error — el error handler debe setear 'error'
-    // y el finalize debe respetar ese estado
     subject.error(new Error('Network error'));
 
     expect(service.listState()).toBe('error');
@@ -128,7 +122,19 @@ describe('HeroesService', () => {
     expect(service.error()).toBe('Error desconocido');
   });
 
-  // ── isListLoading ─────────────────────────────────────────────────────────
+  it('loadAll() finalize should reset listState to idle on success', () => {
+    const subject = new Subject<Hero[]>();
+    repoSpy.getAll.mockReturnValue(subject.asObservable());
+
+    service.loadAll();
+    expect(service.listState()).toBe('loading');
+
+    subject.next(MOCK_HEROES);
+    subject.complete();
+
+    expect(service.listState()).toBe('idle');
+    expect(service.heroes()).toEqual(MOCK_HEROES);
+  });
 
   it('isListLoading should be true while fetching and false after', () => {
     const subject = new Subject<Hero[]>();
@@ -142,8 +148,6 @@ describe('HeroesService', () => {
     expect(service.isListLoading()).toBeFalsy();
   });
 
-  // ── isMutating ────────────────────────────────────────────────────────────
-
   it('isMutating should be true while deleting and false after', () => {
     const subject = new Subject<void>();
     repoSpy.delete.mockReturnValue(subject.asObservable());
@@ -156,8 +160,6 @@ describe('HeroesService', () => {
     expect(service.isMutating()).toBeFalsy();
   });
 
-  // ── isLoading ─────────────────────────────────────────────────────────────
-
   it('isLoading should be true when list is loading', () => {
     const subject = new Subject<Hero[]>();
     repoSpy.getAll.mockReturnValue(subject.asObservable());
@@ -169,8 +171,6 @@ describe('HeroesService', () => {
     subject.complete();
     expect(service.isLoading()).toBeFalsy();
   });
-
-  // ── searchByName ──────────────────────────────────────────────────────────
 
   it('searchByName() with query should call repo.searchByName', () => {
     service.searchByName('man');
@@ -203,6 +203,20 @@ describe('HeroesService', () => {
 
     expect(service.listState()).toBe('error');
     expect(service.error()).toBe('Search failed');
+  });
+
+  it('searchByName() finalize should reset listState to idle on success', () => {
+    const subject = new Subject<Hero[]>();
+    repoSpy.searchByName.mockReturnValue(subject.asObservable());
+
+    service.searchByName('batman');
+    expect(service.listState()).toBe('loading');
+
+    subject.next([MOCK_HEROES[1]]);
+    subject.complete();
+
+    expect(service.listState()).toBe('idle');
+    expect(service.filteredHeroes()).toEqual([MOCK_HEROES[1]]);
   });
 
   // ── getById ───────────────────────────────────────────────────────────────
@@ -249,6 +263,22 @@ describe('HeroesService', () => {
     expect(service.error()).toBe('Create failed');
   });
 
+  it('create() finalize should reset mutationState to idle on success', () => {
+    const dto: CreateHeroDto = { name: 'FLASH', alias: 'Barry Allen', power: 'Velocidad', universe: 'DC' };
+    const newHero: Hero = { ...dto, id: '99', createdAt: new Date() };
+    const subject = new Subject<Hero>();
+    repoSpy.create.mockReturnValue(subject.asObservable());
+
+    service.create(dto).subscribe();
+    expect(service.mutationState()).toBe('loading');
+
+    subject.next(newHero);
+    subject.complete();
+
+    expect(service.mutationState()).toBe('idle');
+    expect(service.heroes().find((h) => h.id === '99')).toEqual(newHero);
+  });
+
   // ── update ────────────────────────────────────────────────────────────────
 
   it('update() should replace hero in state', () => {
@@ -272,6 +302,23 @@ describe('HeroesService', () => {
     expect(service.error()).toBe('Update failed');
   });
 
+  it('update() finalize should reset mutationState to idle on success', () => {
+    service.loadAll();
+    const dto: UpdateHeroDto = { power: 'Nueva habilidad' };
+    const updated: Hero = { ...MOCK_HEROES[0], ...dto };
+    const subject = new Subject<Hero>();
+    repoSpy.update.mockReturnValue(subject.asObservable());
+
+    service.update('1', dto).subscribe();
+    expect(service.mutationState()).toBe('loading');
+
+    subject.next(updated);
+    subject.complete();
+
+    expect(service.mutationState()).toBe('idle');
+    expect(service.heroes().find((h) => h.id === '1')?.power).toBe('Nueva habilidad');
+  });
+
   // ── delete ────────────────────────────────────────────────────────────────
 
   it('delete() should remove hero from state', () => {
@@ -291,5 +338,20 @@ describe('HeroesService', () => {
     subject.error(new Error('Delete failed'));
     expect(service.mutationState()).toBe('error');
     expect(service.error()).toBe('Delete failed');
+  });
+
+  it('delete() finalize should reset mutationState to idle on success', () => {
+    service.loadAll();
+    const subject = new Subject<void>();
+    repoSpy.delete.mockReturnValue(subject.asObservable());
+
+    service.delete('1').subscribe();
+    expect(service.mutationState()).toBe('loading');
+
+    subject.next(undefined);
+    subject.complete();
+
+    expect(service.mutationState()).toBe('idle');
+    expect(service.heroes().find((h) => h.id === '1')).toBeUndefined();
   });
 });

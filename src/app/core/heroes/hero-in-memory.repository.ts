@@ -6,7 +6,7 @@ import { HeroRepository } from './hero.repository';
 import { Hero, CreateHeroDto, UpdateHeroDto } from '../../features/heroes/models/hero.model';
 import { SEED_HEROES } from '../mocks/heroes.mock';
 
-const SIMULATED_DELAY_MS = 600;
+const SIMULATED_DELAY_MS = 300;
 
 let heroes: Hero[] = [...SEED_HEROES];
 

@@ -86,7 +86,13 @@ describe('HeroFormComponent', () => {
 
     it('name control should have minlength error for 1-char name', () => {
       component.nameControl.setValue('A');
-      expect(component.nameControl.hasError('minlength')).toBeTruthy();
+      component.nameControl.markAsTouched();
+      fixture.detectChanges();
+      const errors = fixture.nativeElement.querySelectorAll('mat-error');
+      const hasMinLength = Array.from(errors).some((e: any) =>
+        e.textContent?.includes('2 caracteres')
+      );
+      expect(hasMinLength).toBeTruthy();
     });
 
     it('alias control should have required error when empty', () => {
@@ -97,6 +103,17 @@ describe('HeroFormComponent', () => {
     it('power control should have required error when empty', () => {
       component.powerControl.markAsTouched();
       expect(component.powerControl.hasError('required')).toBeTruthy();
+    });
+
+    it('universe control should show required error when touched and empty', () => {
+      component.universeControl.setValue(null as any);
+      component.universeControl.markAsTouched();
+      fixture.detectChanges();
+      const errors = fixture.nativeElement.querySelectorAll('mat-error');
+      const hasRequired = Array.from(errors).some((e: any) =>
+        e.textContent?.includes('universo')
+      );
+      expect(hasRequired).toBeTruthy();
     });
 
     it('universe control should default to DC', () => {
@@ -148,8 +165,6 @@ describe('HeroFormComponent', () => {
 
     it('onSubmit() should call update() and navigate when form is valid', () => {
       component.onSubmit();
-
-      // ✅ Vitest usa expect.objectContaining, no jasmine.objectContaining
       expect(serviceSpy.update).toHaveBeenCalledWith(
         '42',
         expect.objectContaining({ name: MOCK_HERO.name })
@@ -158,8 +173,6 @@ describe('HeroFormComponent', () => {
       expect(routerSpy.navigate).toHaveBeenCalledWith(['/heroes']);
     });
   });
-
-  // ── Hero not found ────────────────────────────────────────────────────────
 
   describe('edit mode – hero not found', () => {
     it('should redirect to /heroes when hero id is not found', async () => {

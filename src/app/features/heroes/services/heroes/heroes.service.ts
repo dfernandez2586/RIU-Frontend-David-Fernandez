@@ -56,7 +56,7 @@ export class HeroesService {
       .getAll()
       .pipe(
         withLoading(this._loadingService),
-        // Solo resetea a idle si no hubo error
+        // El finalize es la única fuente de reset a 'idle' (safety net)
         finalize(() => {
           if (this._state().listState === 'loading') {
             this._patchState({ listState: 'idle' });
@@ -65,7 +65,8 @@ export class HeroesService {
       )
       .subscribe({
         next: (heroes) =>
-          this._patchState({ heroes, filteredHeroes: heroes, cacheValid: true, listState: 'idle' }),
+          // Sin listState: 'idle' — lo setea el finalize tras el next
+          this._patchState({ heroes, filteredHeroes: heroes, cacheValid: true }),
         error: (err) =>
           this._patchState({ listState: 'error', error: this._extractMessage(err) }),
       });
@@ -93,7 +94,8 @@ export class HeroesService {
       )
       .subscribe({
         next: (filteredHeroes) =>
-          this._patchState({ filteredHeroes, cacheValid: false, listState: 'idle' }),
+          // Sin listState: 'idle' — lo setea el finalize tras el next
+          this._patchState({ filteredHeroes, cacheValid: false }),
         error: (err) =>
           this._patchState({ listState: 'error', error: this._extractMessage(err) }),
       });
@@ -118,10 +120,10 @@ export class HeroesService {
     return this._repo.create(dto).pipe(
       withLoading(this._loadingService),
       tap((hero) =>
+        // Sin mutationState: 'idle' — lo setea el finalize
         this._patchState({
           heroes: [...this._state().heroes, hero],
           filteredHeroes: [...this._state().filteredHeroes, hero],
-          mutationState: 'idle',
           cacheValid: false,
         })
       ),
@@ -144,10 +146,10 @@ export class HeroesService {
       withLoading(this._loadingService),
       tap((updated) => {
         const replaceFn = (h: Hero) => (h.id === id ? updated : h);
+        // Sin mutationState: 'idle' — lo setea el finalize
         this._patchState({
           heroes: this._state().heroes.map(replaceFn),
           filteredHeroes: this._state().filteredHeroes.map(replaceFn),
-          mutationState: 'idle',
           cacheValid: false,
         });
       }),
@@ -170,10 +172,10 @@ export class HeroesService {
       withLoading(this._loadingService),
       tap(() => {
         const filterFn = (h: Hero) => h.id !== id;
+        // Sin mutationState: 'idle' — lo setea el finalize
         this._patchState({
           heroes: this._state().heroes.filter(filterFn),
           filteredHeroes: this._state().filteredHeroes.filter(filterFn),
-          mutationState: 'idle',
           cacheValid: false,
         });
       }),

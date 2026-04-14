@@ -26,18 +26,16 @@ function makeServiceSpy() {
   const _filteredHeroes = signal<Hero[]>(MOCK_HEROES);
   const _error = signal<string | null>(null);
   const _isListLoading = signal(false);
-  const _isMutating = signal(false);
 
   return {
     filteredHeroes: _filteredHeroes.asReadonly(),
     error: _error.asReadonly(),
     isListLoading: _isListLoading.asReadonly(),
-    isMutating: _isMutating.asReadonly(),
+    isMutating: signal(false).asReadonly(),
     isLoading: signal(false).asReadonly(),
     loadAll: vi.fn(),
     searchByName: vi.fn(),
     delete: vi.fn().mockReturnValue(of(undefined)),
-    // expose internals so tests can change state
     _filteredHeroes,
     _error,
     _isListLoading,
@@ -119,6 +117,18 @@ describe('HeroListComponent', () => {
     await fixture.whenStable();
     const errorState = fixture.nativeElement.querySelector('.error-state');
     expect(errorState).not.toBeNull();
+  });
+
+  it('retry button in error state should call loadAll(true)', async () => {
+    serviceSpy._error.set('Network error');
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const retryBtn = fixture.nativeElement
+      .querySelector('.error-state button');
+    retryBtn?.click();
+
+    expect(serviceSpy.loadAll).toHaveBeenCalledWith(true);
   });
 
   // ── Filter ────────────────────────────────────────────────────────────────

@@ -2,6 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Component } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { By } from '@angular/platform-browser';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
 import { UppercaseDirective } from './uppercase.directive';
 
 @Component({
@@ -17,6 +19,7 @@ describe('UppercaseDirective', () => {
   let fixture: ComponentFixture<TestHostComponent>;
   let inputEl: HTMLInputElement;
   let component: TestHostComponent;
+  let directive: UppercaseDirective;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -27,12 +30,12 @@ describe('UppercaseDirective', () => {
     component = fixture.componentInstance;
     fixture.detectChanges();
     inputEl = fixture.debugElement.query(By.css('input')).nativeElement;
+    directive = fixture.debugElement
+      .query(By.directive(UppercaseDirective))
+      .injector.get(UppercaseDirective);
   });
 
   it('should be created', () => {
-    const directive = fixture.debugElement
-      .query(By.directive(UppercaseDirective))
-      .injector.get(UppercaseDirective);
     expect(directive).toBeTruthy();
   });
 
@@ -81,5 +84,20 @@ describe('UppercaseDirective', () => {
     component.nameControl.enable();
     fixture.detectChanges();
     expect(inputEl.disabled).toBeFalsy();
+  });
+
+  it('registerOnChange() should store and call the provided function', () => {
+    const fn = vi.fn();
+    directive.registerOnChange(fn);
+    inputEl.value = 'hulk';
+    inputEl.dispatchEvent(new Event('input'));
+    expect(fn).toHaveBeenCalledWith('HULK');
+  });
+
+  it('registerOnTouched() should store and call the provided function', () => {
+    const fn = vi.fn();
+    directive.registerOnTouched(fn);
+    inputEl.dispatchEvent(new Event('blur'));
+    expect(fn).toHaveBeenCalled();
   });
 });
