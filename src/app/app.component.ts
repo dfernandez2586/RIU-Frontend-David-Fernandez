@@ -8,24 +8,32 @@ import { SpinnerComponent } from './shared/components/spinner/spinner.component'
   standalone: true,
   imports: [RouterOutlet, MatToolbarModule, SpinnerComponent],
   template: `
-    <mat-toolbar color="primary">
-      <span>🦸 Súper Héroes</span>
-    </mat-toolbar>
-
     <main class="app-container">
       <router-outlet />
     </main>
 
     <app-spinner />
   `,
-  styles: [
-    `
-      mat-toolbar span {
-        font-size: 1.25rem;
-        font-weight: 500;
-        letter-spacing: 0.5px;
-      }
-    `,
-  ],
+  styles: [`
+    .app-toolbar {
+      background: linear-gradient(135deg, #1a1a2e 0%, #3949ab 100%);
+      color: #fff;
+      box-shadow: 0 2px 12px rgba(57, 73, 171, 0.35);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .toolbar-logo {
+      font-size: 1.5rem;
+      margin-right: 10px;
+    }
+
+    .toolbar-title {
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+  `],
 })
 export class AppComponent {}

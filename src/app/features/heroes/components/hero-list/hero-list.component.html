@@ -1,45 +1,57 @@
-    <!-- Toolbar: filter + add button -->
-    <div class="list-header">
-      <mat-form-field appearance="outline" class="filter-field">
-        <mat-label>Buscar héroe</mat-label>
-        <input matInput [formControl]="filterControl" placeholder="ej. man" />
-        <mat-icon matSuffix>search</mat-icon>
-      </mat-form-field>
-
-      <button mat-raised-button color="primary" (click)="navigateToNew()">
-        <mat-icon>add</mat-icon>
-        Nuevo héroe
-      </button>
+ <!-- Header con título + contador + botón en la misma línea -->
+    <div class="page-header">
+      <div class="page-title">
+        <h1>Súper Héroes</h1>
+        <span class="hero-count">{{ filteredHeroes().length }} héroes</span>
+        <button mat-flat-button color="primary" class="add-btn" (click)="navigateToNew()">
+          <mat-icon>add</mat-icon>
+          Nuevo héroe
+        </button>
+      </div>
     </div>
 
-    <!-- Empty state -->
-    @if (pagedHeroes().length === 0) {
-      <div class="empty-state">
-        <mat-icon>search_off</mat-icon>
-        <p>No se encontraron héroes.</p>
-      </div>
-    }
+    <!-- Filter -->
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Buscar héroe por nombre</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput [formControl]="filterControl" placeholder="ej. man, super..." />
+      @if (filterControl.value) {
+        <button matSuffix mat-icon-button aria-label="Limpiar" (click)="clearFilter()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </mat-form-field>
 
-    <!-- Grid of cards -->
-    <div class="hero-grid">
-      @for (hero of pagedHeroes(); track hero.id) {
-        <app-hero-card
-          [hero]="hero"
-          (editClicked)="navigateToEdit($event)"
-          (deleteClicked)="openDeleteDialog($event)"
+    <!-- Contenido: oculto durante carga inicial -->
+    @if (!isInitialLoading()) {
+
+      @if (filteredHeroes().length === 0) {
+        <div class="empty-state">
+          <mat-icon>search_off</mat-icon>
+          <p>No se encontraron héroes con "<strong>{{ filterControl.value }}</strong>"</p>
+          <button mat-stroked-button (click)="clearFilter()">Limpiar búsqueda</button>
+        </div>
+      }
+
+      @if (filteredHeroes().length > 0) {
+        <div class="hero-grid">
+          @for (hero of pagedHeroes(); track hero.id) {
+            <app-hero-card
+              [hero]="hero"
+              (editClicked)="navigateToEdit($event)"
+              (deleteClicked)="openDeleteDialog($event)"
+            />
+          }
+        </div>
+
+        <mat-paginator
+          [length]="filteredHeroes().length"
+          [pageSize]="currentPageSize()"
+          [pageIndex]="pageIndex()"
+          [pageSizeOptions]="[4, 8, 12]"
+          (page)="onPageChange($event)"
+          showFirstLastButtons
+          aria-label="Páginas de héroes"
         />
       }
-    </div>
-
-    <!-- Paginator -->
-    @if (filteredHeroes().length > 0) {
-      <mat-paginator
-        [length]="filteredHeroes().length"
-        [pageSize]="pageSize"
-        [pageIndex]="pageIndex()"
-        [pageSizeOptions]="[3, 6, 12]"
-        (page)="onPageChange($event)"
-        showFirstLastButtons
-        aria-label="Páginas de héroes"
-      />
     }

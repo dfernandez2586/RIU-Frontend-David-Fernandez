@@ -1,21 +1,26 @@
-    <mat-card appearance="outlined" >
-      <mat-card-header>
-        <mat-card-title>{{ hero().name }}</mat-card-title>
-        <mat-card-subtitle>{{ hero().alias }}</mat-card-subtitle>
-      </mat-card-header>
+    <div class="hero-card">
+      <!-- Universe badge -->
+      <span
+        class="universe-badge"
+        [style.background]="universeStyle.bg"
+        [style.color]="universeStyle.color"
+      >
+        {{ hero().universe }}
+      </span>
 
-      <mat-card-content>
-        <p class="power">{{ hero().power }}</p>
-        <mat-chip-set>
-          <mat-chip [highlighted]="true">{{ hero().universe }}</mat-chip>
-        </mat-chip-set>
-      </mat-card-content>
+      <!-- Content -->
+      <div class="card-body">
+        <h3 class="hero-name">{{ hero().name }}</h3>
+        <p class="hero-alias">{{ hero().alias }}</p>
+        <p class="hero-power">{{ hero().power }}</p>
+      </div>
 
-      <mat-card-actions align="end">
+      <!-- Actions -->
+      <div class="card-actions">
         <button
           mat-icon-button
-          color="primary"
-          matTooltip="Editar"
+          class="action-btn edit-btn"
+          matTooltip="Editar héroe"
           (click)="editClicked.emit(hero())"
           aria-label="Editar héroe"
         >
@@ -23,12 +28,12 @@
         </button>
         <button
           mat-icon-button
-          color="warn"
-          matTooltip="Eliminar"
+          class="action-btn delete-btn"
+          matTooltip="Eliminar héroe"
           (click)="deleteClicked.emit(hero())"
           aria-label="Eliminar héroe"
         >
           <mat-icon>delete</mat-icon>
         </button>
-      </mat-card-actions>
-    </mat-card>
+      </div>
+    </div>

@@ -5,7 +5,7 @@ import {
 import { By } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import { provideRouter } from '@angular/router';
-import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { of } from 'rxjs';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -101,25 +101,40 @@ describe('HeroListComponent', () => {
   // ── Filter ────────────────────────────────────────────────────────────────
 
   it('should update filter signal and reset page after debounce', async () => {
-    const filterSpy = vi.spyOn(component['_filter'], 'set');
-    const pageResetSpy = vi.spyOn(component.pageIndex, 'set');
+    let capturedFilter: string | undefined;
+    let capturedPage: number | undefined;
+
+    const originalFilterSet = component['_filter'].set.bind(component['_filter']);
+    const originalPageSet = component.pageIndex.set.bind(component.pageIndex);
+
+    vi.spyOn(component['_filter'], 'set').mockImplementation((v: string) => {
+      capturedFilter = v;
+      originalFilterSet(v);
+    });
+
+    vi.spyOn(component.pageIndex, 'set').mockImplementation((v: number) => {
+      capturedPage = v;
+      originalPageSet(v);
+    });
 
     component.filterControl.setValue('superman');
+    await new Promise((r) => setTimeout(r, 350));
 
-    await new Promise((r) => setTimeout(r, 300));
-
-    expect(filterSpy).toHaveBeenCalledWith('superman');
-    expect(pageResetSpy).toHaveBeenCalledWith(0);
+    expect(capturedFilter).toBe('superman');
+    expect(capturedPage).toBe(0);
   });
 
   it('should NOT update filter before debounce elapses', async () => {
-    const filterSpy = vi.spyOn(component['_filter'], 'set');
+    let called = false;
+
+    vi.spyOn(component['_filter'], 'set').mockImplementation(() => {
+      called = true;
+    });
 
     component.filterControl.setValue('bat');
-
     await new Promise((r) => setTimeout(r, 100));
 
-    expect(filterSpy).not.toHaveBeenCalled();
+    expect(called).toBe(false);
   });
 
   // ── Pagination ────────────────────────────────────────────────────────────

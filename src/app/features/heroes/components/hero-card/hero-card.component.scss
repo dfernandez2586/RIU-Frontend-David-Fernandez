@@ -1,8 +1,76 @@
-mat-card {
-        height: 100%;
+    .hero-card {
+      position: relative;
+      background: #fff;
+      border: 1px solid #e8e8f0;
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: box-shadow 0.2s, transform 0.2s;
+      height: 100%;
+      box-sizing: border-box;
+
+      &:hover {
+        box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+        transform: translateY(-2px);
       }
-      .power {
-        font-size: 0.875rem;
-        color: var(--mat-card-subtitle-text-color);
-        margin: 8px 0;
-      }
+    }
+
+    .universe-badge {
+      display: inline-block;
+      align-self: flex-start;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+
+    .card-body {
+      flex: 1;
+    }
+
+    .hero-name {
+      margin: 0 0 4px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      letter-spacing: 0.3px;
+    }
+
+    .hero-alias {
+      margin: 0 0 10px;
+      font-size: 0.85rem;
+      color: #888;
+      font-style: italic;
+    }
+
+    .hero-power {
+      margin: 0;
+      font-size: 0.875rem;
+      color: #555;
+      line-height: 1.5;
+    }
+
+    .card-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 4px;
+      border-top: 1px solid #f0f0f5;
+      padding-top: 10px;
+      margin-top: auto;
+    }
+
+    .action-btn {
+      width: 36px;
+      height: 36px;
+      mat-icon { font-size: 18px; }
+    }
+
+    .edit-btn { color: #3949ab; }
+    .edit-btn:hover { background: #e8eaf6; }
+
+    .delete-btn { color: #e53935; }
+    .delete-btn:hover { background: #ffebee; }
