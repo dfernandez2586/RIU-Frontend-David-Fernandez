@@ -16,7 +16,7 @@ FROM nginx:1.27-alpine AS runner
 RUN rm -rf /usr/share/nginx/html/*
  
 # Copy built Angular app
-COPY --from=builder /app/dist/superheroes/browser /usr/share/nginx/html
+COPY --from=builder /app/dist/RIU-Frontend-David-Fernandez/browser/* /usr/share/nginx/html
  
 # Copy custom nginx config
 COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
