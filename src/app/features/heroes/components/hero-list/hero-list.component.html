@@ -1,8 +1,8 @@
- <!-- Header con título + contador + botón en la misma línea -->
+<!-- Header -->
     <div class="page-header">
       <div class="page-title">
         <h1>Súper Héroes</h1>
-        <span class="hero-count">{{ filteredHeroes().length }} héroes</span>
+        <span class="hero-count">{{ heroesService.filteredHeroes().length }} héroes</span>
         <button mat-flat-button color="primary" class="add-btn" (click)="navigateToNew()">
           <mat-icon>add</mat-icon>
           Nuevo héroe
@@ -22,10 +22,19 @@
       }
     </mat-form-field>
 
-    <!-- Contenido: oculto durante carga inicial -->
-    @if (!isInitialLoading()) {
+    <!-- Error -->
+    @if (heroesService.error()) {
+      <div class="error-state">
+        <mat-icon>error_outline</mat-icon>
+        <p>{{ heroesService.error() }}</p>
+        <button mat-stroked-button (click)="heroesService.loadAll(true)">Reintentar</button>
+      </div>
+    }
 
-      @if (filteredHeroes().length === 0) {
+    <!-- Contenido -->
+    @if (!heroesService.isListLoading() && !heroesService.error()) {
+
+      @if (heroesService.filteredHeroes().length === 0) {
         <div class="empty-state">
           <mat-icon>search_off</mat-icon>
           <p>No se encontraron héroes con "<strong>{{ filterControl.value }}</strong>"</p>
@@ -33,7 +42,7 @@
         </div>
       }
 
-      @if (filteredHeroes().length > 0) {
+      @if (heroesService.filteredHeroes().length > 0) {
         <div class="hero-grid">
           @for (hero of pagedHeroes(); track hero.id) {
             <app-hero-card
@@ -45,7 +54,7 @@
         </div>
 
         <mat-paginator
-          [length]="filteredHeroes().length"
+          [length]="heroesService.filteredHeroes().length"
           [pageSize]="currentPageSize()"
           [pageIndex]="pageIndex()"
           [pageSizeOptions]="[4, 8, 12]"

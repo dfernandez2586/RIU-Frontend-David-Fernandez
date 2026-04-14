@@ -19,7 +19,6 @@ import { MatInputModule } from '@angular/material/input';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
-import { LoadingService } from '../../../../core/interceptors/loading.service';
 import { Hero } from '../../models/hero.model';
 import { HeroCardComponent } from '../hero-card/hero-card.component';
 import {
@@ -28,7 +27,7 @@ import {
 } from '../confirm-dialog/confirm-dialog.component';
 import { HeroesService } from '../../services/heroes/heroes.service';
 
-const PAGE_SIZE = 4;
+const PAGE_SIZE = 10;
 const INITIAL_LOAD_DELAY_MS = 800;
 
 @Component({
@@ -41,15 +40,14 @@ const INITIAL_LOAD_DELAY_MS = 800;
     MatIconModule,
     MatInputModule,
     MatPaginatorModule,
-    HeroCardComponent
-
+    HeroCardComponent,
   ],
   templateUrl: './hero-list.component.html',
-  styleUrl: './hero-list.component.scss',
+  styleUrl: './hero-list.component.scss'
 })
 export class HeroListComponent implements OnInit {
-  private readonly _heroesService = inject(HeroesService);
-  private readonly _loadingService = inject(LoadingService);
+  readonly heroesService = inject(HeroesService);
+
   private readonly _router = inject(Router);
   private readonly _dialog = inject(MatDialog);
   private readonly _snackBar = inject(MatSnackBar);
@@ -58,32 +56,17 @@ export class HeroListComponent implements OnInit {
   readonly filterControl = new FormControl('', { nonNullable: true });
   readonly pageIndex = signal(0);
   readonly currentPageSize = signal(PAGE_SIZE);
-  readonly isInitialLoading = signal(true);
 
-  get pageSize() {
-    return PAGE_SIZE;
-  }
-
-  private readonly _filter = signal('');
-
-  readonly filteredHeroes = computed(() =>
-    this._heroesService.searchByName(this._filter())
-  );
+  get pageSize() { return PAGE_SIZE; }
 
   readonly pagedHeroes = computed(() => {
     const start = this.pageIndex() * this.currentPageSize();
-    return this.filteredHeroes().slice(start, start + this.currentPageSize());
+    return this.heroesService.filteredHeroes().slice(start, start + this.currentPageSize());
   });
 
   ngOnInit(): void {
-    // Spinner en carga inicial
-    this._loadingService.show();
-    setTimeout(() => {
-      this._loadingService.hide();
-      this.isInitialLoading.set(false);
-    }, INITIAL_LOAD_DELAY_MS);
+    this.heroesService.loadAll();
 
-    // Filtro con debounce
     this.filterControl.valueChanges
       .pipe(
         debounceTime(300),
@@ -91,7 +74,7 @@ export class HeroListComponent implements OnInit {
         takeUntilDestroyed(this._destroyRef)
       )
       .subscribe((value) => {
-        this._filter.set(value);
+        this.heroesService.searchByName(value);
         this.pageIndex.set(0);
       });
   }
@@ -119,21 +102,15 @@ export class HeroListComponent implements OnInit {
       message: `¿Estás seguro de que deseas eliminar a ${hero.name}?`,
     };
 
-    const dialogRef = this._dialog.open(ConfirmDialogComponent, {
-      width: '420px',
-      data,
-    });
-
-    dialogRef
+    this._dialog
+      .open(ConfirmDialogComponent, { width: '420px', data })
       .afterClosed()
       .pipe(takeUntilDestroyed(this._destroyRef))
       .subscribe((confirmed: boolean) => {
-        if (confirmed) {
-          this._heroesService.delete(hero.id);
-          this._snackBar.open(`${hero.name} eliminado`, 'Cerrar', {
-            duration: 3000,
-          });
-        }
+        if (!confirmed) return;
+        this.heroesService.delete(hero.id).subscribe(() => {
+          this._snackBar.open(`${hero.name} eliminado`, 'Cerrar', { duration: 3000 });
+        });
       });
   }
 }

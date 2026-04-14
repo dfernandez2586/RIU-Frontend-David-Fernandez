@@ -5,6 +5,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -14,9 +15,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { Hero } from '../../models/hero.model';
-import { HeroesService } from '../../services/heroes/heroes.service';
-
 import { UppercaseDirective } from '../../../../shared/directives/uppercase/uppercase.directive';
+import { HeroesService } from '../../services/heroes/heroes.service';
 
 @Component({
   selector: 'app-hero-form',
@@ -35,7 +35,7 @@ import { UppercaseDirective } from '../../../../shared/directives/uppercase/uppe
 })
 export class HeroFormComponent implements OnInit {
   private readonly _fb = inject(FormBuilder);
-  private readonly _heroesService = inject(HeroesService);
+  readonly heroesService = inject(HeroesService);
   private readonly _route = inject(ActivatedRoute);
   private readonly _router = inject(Router);
   private readonly _snackBar = inject(MatSnackBar);
@@ -51,30 +51,29 @@ export class HeroFormComponent implements OnInit {
     universe: ['DC' as Hero['universe'], Validators.required],
   });
 
-  get nameControl() {
-    return this.heroForm.controls.name;
-  }
-  get aliasControl() {
-    return this.heroForm.controls.alias;
-  }
-  get powerControl() {
-    return this.heroForm.controls.power;
-  }
-  get universeControl() {
-    return this.heroForm.controls.universe;
-  }
+  get nameControl() { return this.heroForm.controls.name; }
+  get aliasControl() { return this.heroForm.controls.alias; }
+  get powerControl() { return this.heroForm.controls.power; }
+  get universeControl() { return this.heroForm.controls.universe; }
 
   ngOnInit(): void {
     this._heroId = this._route.snapshot.paramMap.get('id');
-    if (this._heroId) {
-      this.isEditMode = true;
-      const hero = this._heroesService.getById(this._heroId);
+    if (!this._heroId) return;
+
+    this.isEditMode = true;
+
+    this.heroesService.getById(this._heroId).subscribe((hero) => {
       if (!hero) {
         this._router.navigate(['/heroes']);
         return;
       }
-      this.heroForm.patchValue(hero);
-    }
+      this.heroForm.patchValue({
+        name: hero.name,
+        alias: hero.alias,
+        power: hero.power,
+        universe: hero.universe,
+      });
+    });
   }
 
   onSubmit(): void {
@@ -83,14 +82,20 @@ export class HeroFormComponent implements OnInit {
     const { name, alias, power, universe } = this.heroForm.getRawValue();
 
     if (this.isEditMode && this._heroId) {
-      this._heroesService.update(this._heroId, { name, alias, power, universe });
-      this._snackBar.open('Héroe actualizado', 'Cerrar', { duration: 3000 });
+      this.heroesService
+        .update(this._heroId, { name, alias, power, universe })
+        .subscribe(() => {
+          this._snackBar.open('Héroe actualizado', 'Cerrar', { duration: 3000 });
+          this._router.navigate(['/heroes']);
+        });
     } else {
-      this._heroesService.create({ name, alias, power, universe });
-      this._snackBar.open('Héroe creado', 'Cerrar', { duration: 3000 });
+      this.heroesService
+        .create({ name, alias, power, universe })
+        .subscribe(() => {
+          this._snackBar.open('Héroe creado', 'Cerrar', { duration: 3000 });
+          this._router.navigate(['/heroes']);
+        });
     }
-
-    this._router.navigate(['/heroes']);
   }
 
   goBack(): void {

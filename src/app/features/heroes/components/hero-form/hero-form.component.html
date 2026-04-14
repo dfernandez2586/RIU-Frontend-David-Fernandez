@@ -1,4 +1,4 @@
-<div class="form-wrapper">
+    <div class="form-wrapper">
       <div class="form-header">
         <button mat-icon-button (click)="goBack()" aria-label="Volver">
           <mat-icon>arrow_back</mat-icon>
@@ -27,11 +27,7 @@
         <!-- Alias -->
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Alias</mat-label>
-          <input
-            matInput
-            formControlName="alias"
-            placeholder="Clark Kent"
-          />
+          <input matInput formControlName="alias" placeholder="Clark Kent" />
           @if (aliasControl.hasError('required')) {
             <mat-error>El alias es obligatorio</mat-error>
           }
@@ -71,7 +67,7 @@
             mat-flat-button
             color="primary"
             type="submit"
-            [disabled]="heroForm.invalid"
+            [disabled]="heroForm.invalid || heroesService.isMutating()"
           >
             {{ isEditMode ? 'Guardar cambios' : 'Crear héroe' }}
           </button>

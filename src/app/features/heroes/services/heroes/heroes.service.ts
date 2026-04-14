@@ -1,128 +1,203 @@
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Injectable, inject, signal, computed } from '@angular/core';
+import { Observable, tap, finalize, catchError, throwError } from 'rxjs';
+
+import { HeroRepository } from '../../../../core/heroes/hero.repository';
 import { LoadingService } from '../../../../core/interceptors/loading.service';
+import { withLoading } from '../../../../core/operators/with-loading.operator';
 import { CreateHeroDto, Hero, UpdateHeroDto } from '../../models/hero.model';
- 
-const SIMULATED_DELAY_MS = 600;
- 
-const INITIAL_HEROES: Hero[] = [
-  {
-    id: '1',
-    name: 'SUPERMAN',
-    alias: 'Clark Kent',
-    power: 'Vuelo, super fuerza, visión de rayos X',
-    universe: 'DC',
-    createdAt: new Date('2000-01-01'),
-  },
-  {
-    id: '2',
-    name: 'SPIDERMAN',
-    alias: 'Peter Parker',
-    power: 'Sentido arácnido, trepar paredes, telarañas',
-    universe: 'Marvel',
-    createdAt: new Date('2000-01-02'),
-  },
-  {
-    id: '3',
-    name: 'BATMAN',
-    alias: 'Bruce Wayne',
-    power: 'Inteligencia, artes marciales, tecnología',
-    universe: 'DC',
-    createdAt: new Date('2000-01-03'),
-  },
-  {
-    id: '4',
-    name: 'IRONMAN',
-    alias: 'Tony Stark',
-    power: 'Armadura tecnológica, inteligencia',
-    universe: 'Marvel',
-    createdAt: new Date('2000-01-04'),
-  },
-  {
-    id: '5',
-    name: 'WONDER WOMAN',
-    alias: 'Diana Prince',
-    power: 'Super fuerza, lazo de la verdad, vuelo',
-    universe: 'DC',
-    createdAt: new Date('2000-01-05'),
-  },
-  {
-    id: '6',
-    name: 'MARTÍN KARADAGIÁN',
-    alias: 'Martín Karadagián',
-    power: 'Fuerza descomunal, resistencia',
-    universe: 'Other',
-    createdAt: new Date('2000-01-06'),
-  },
-];
- 
+
+export type OperationState = 'idle' | 'loading' | 'error';
+
+export interface HeroesState {
+  heroes: Hero[];
+  filteredHeroes: Hero[];
+  listState: OperationState;
+  mutationState: OperationState;
+  error: string | null;
+  cacheValid: boolean;
+}
+
+const INITIAL_STATE: HeroesState = {
+  heroes: [],
+  filteredHeroes: [],
+  listState: 'idle',
+  mutationState: 'idle',
+  error: null,
+  cacheValid: false,
+};
+
 @Injectable({ providedIn: 'root' })
 export class HeroesService {
+  private readonly _repo = inject(HeroRepository);
   private readonly _loadingService = inject(LoadingService);
-  private readonly _heroes = signal<Hero[]>([...INITIAL_HEROES]);
- 
-  readonly heroes = this._heroes.asReadonly();
-  readonly heroCount = computed(() => this._heroes().length);
- 
-  // ── READ ──────────────────────────────────────────────────────────────
- 
-  getAll(): Hero[] {
-    return this._heroes();
-  }
- 
-  getById(id: string): Hero | undefined {
-    return this._heroes().find((h) => h.id === id);
-  }
- 
-  searchByName(query: string): Hero[] {
-    const q = query.trim().toLowerCase();
-    if (!q) return this._heroes();
-    return this._heroes().filter((h) => h.name.toLowerCase().includes(q));
-  }
- 
-  // ── WRITE con spinner ─────────────────────────────────────────────────
- 
-  create(dto: CreateHeroDto): Hero {
-    this._withLoading(() => {
-      const hero: Hero = {
-        ...dto,
-        id: this._generateId(),
-        createdAt: new Date(),
-      };
-      this._heroes.update((list) => [...list, hero]);
-    });
-    return this._heroes()[this._heroes().length - 1];
-  }
- 
-  update(id: string, dto: UpdateHeroDto): Hero {
-    let updated: Hero | undefined;
-    this._withLoading(() => {
-      this._heroes.update((list) =>
-        list.map((h) => {
-          if (h.id !== id) return h;
-          updated = { ...h, ...dto };
-          return updated!;
+
+  // ── State ────────────────────────────────────────────────────────────────
+  private readonly _state = signal<HeroesState>({ ...INITIAL_STATE });
+
+  // ── Public selectors ──────────────────────────────────────────────────────
+  readonly heroes = computed(() => this._state().heroes);
+  readonly filteredHeroes = computed(() => this._state().filteredHeroes);
+  readonly listState = computed(() => this._state().listState);
+  readonly mutationState = computed(() => this._state().mutationState);
+  readonly error = computed(() => this._state().error);
+  readonly isListLoading = computed(() => this._state().listState === 'loading');
+  readonly isMutating = computed(() => this._state().mutationState === 'loading');
+  readonly isLoading = computed(() => this.isListLoading() || this.isMutating());
+  readonly heroCount = computed(() => this._state().heroes.length);
+
+  // ── READ ──────────────────────────────────────────────────────────────────
+
+  loadAll(force = false): void {
+    if (this._state().cacheValid && !force) return;
+
+    this._patchState({ listState: 'loading', error: null });
+
+    this._repo
+      .getAll()
+      .pipe(
+        withLoading(this._loadingService),
+        // Solo resetea a idle si no hubo error
+        finalize(() => {
+          if (this._state().listState === 'loading') {
+            this._patchState({ listState: 'idle' });
+          }
         })
-      );
-    });
-    if (!updated) throw new Error(`Hero with id "${id}" not found`);
-    return updated;
+      )
+      .subscribe({
+        next: (heroes) =>
+          this._patchState({ heroes, filteredHeroes: heroes, cacheValid: true, listState: 'idle' }),
+        error: (err) =>
+          this._patchState({ listState: 'error', error: this._extractMessage(err) }),
+      });
   }
- 
-  delete(id: string): void {
-    this._withLoading(() => {
-      this._heroes.update((list) => list.filter((h) => h.id !== id));
-    });
+
+  searchByName(query: string): void {
+    const q = query.trim();
+
+    if (!q) {
+      this.loadAll(true);
+      return;
+    }
+
+    this._patchState({ listState: 'loading', error: null });
+
+    this._repo
+      .searchByName(q)
+      .pipe(
+        withLoading(this._loadingService),
+        finalize(() => {
+          if (this._state().listState === 'loading') {
+            this._patchState({ listState: 'idle' });
+          }
+        })
+      )
+      .subscribe({
+        next: (filteredHeroes) =>
+          this._patchState({ filteredHeroes, cacheValid: false, listState: 'idle' }),
+        error: (err) =>
+          this._patchState({ listState: 'error', error: this._extractMessage(err) }),
+      });
   }
- 
-  // ── PRIVATE ───────────────────────────────────────────────────────────
- 
-  private _withLoading(fn: () => void): void {
-    this._loadingService.show();
-    fn();
-    setTimeout(() => this._loadingService.hide(), SIMULATED_DELAY_MS);
+
+  getById(id: string): Observable<Hero | undefined> {
+    const cached = this._state().heroes.find((h) => h.id === id);
+    if (cached) {
+      return new Observable((obs) => {
+        obs.next(cached);
+        obs.complete();
+      });
+    }
+    return this._repo.getById(id).pipe(withLoading(this._loadingService));
   }
- 
-  private _generateId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+  // ── WRITE ─────────────────────────────────────────────────────────────────
+
+  create(dto: CreateHeroDto): Observable<Hero> {
+    this._patchState({ mutationState: 'loading', error: null });
+
+    return this._repo.create(dto).pipe(
+      withLoading(this._loadingService),
+      tap((hero) =>
+        this._patchState({
+          heroes: [...this._state().heroes, hero],
+          filteredHeroes: [...this._state().filteredHeroes, hero],
+          mutationState: 'idle',
+          cacheValid: false,
+        })
+      ),
+      catchError((err) => {
+        this._patchState({ mutationState: 'error', error: this._extractMessage(err) });
+        return throwError(() => err);
+      }),
+      finalize(() => {
+        if (this._state().mutationState === 'loading') {
+          this._patchState({ mutationState: 'idle' });
+        }
+      })
+    );
+  }
+
+  update(id: string, dto: UpdateHeroDto): Observable<Hero> {
+    this._patchState({ mutationState: 'loading', error: null });
+
+    return this._repo.update(id, dto).pipe(
+      withLoading(this._loadingService),
+      tap((updated) => {
+        const replaceFn = (h: Hero) => (h.id === id ? updated : h);
+        this._patchState({
+          heroes: this._state().heroes.map(replaceFn),
+          filteredHeroes: this._state().filteredHeroes.map(replaceFn),
+          mutationState: 'idle',
+          cacheValid: false,
+        });
+      }),
+      catchError((err) => {
+        this._patchState({ mutationState: 'error', error: this._extractMessage(err) });
+        return throwError(() => err);
+      }),
+      finalize(() => {
+        if (this._state().mutationState === 'loading') {
+          this._patchState({ mutationState: 'idle' });
+        }
+      })
+    );
+  }
+
+  delete(id: string): Observable<void> {
+    this._patchState({ mutationState: 'loading', error: null });
+
+    return this._repo.delete(id).pipe(
+      withLoading(this._loadingService),
+      tap(() => {
+        const filterFn = (h: Hero) => h.id !== id;
+        this._patchState({
+          heroes: this._state().heroes.filter(filterFn),
+          filteredHeroes: this._state().filteredHeroes.filter(filterFn),
+          mutationState: 'idle',
+          cacheValid: false,
+        });
+      }),
+      catchError((err) => {
+        this._patchState({ mutationState: 'error', error: this._extractMessage(err) });
+        return throwError(() => err);
+      }),
+      finalize(() => {
+        if (this._state().mutationState === 'loading') {
+          this._patchState({ mutationState: 'idle' });
+        }
+      })
+    );
+  }
+
+  // ── PRIVATE ───────────────────────────────────────────────────────────────
+
+  private _patchState(partial: Partial<HeroesState>): void {
+    this._state.update((s) => ({ ...s, ...partial }));
+  }
+
+  private _extractMessage(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    if (typeof err === 'string') return err;
+    return 'Error desconocido';
   }
 }

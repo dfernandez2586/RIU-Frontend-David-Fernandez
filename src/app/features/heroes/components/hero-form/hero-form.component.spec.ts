@@ -1,10 +1,9 @@
-import {
-  ComponentFixture,
-  TestBed,
-} from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { provideRouter } from '@angular/router';
+import { of } from 'rxjs';
+import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import { HeroFormComponent } from './hero-form.component';
@@ -27,97 +26,77 @@ function buildRoute(id: string | null) {
   };
 }
 
+function makeServiceSpy() {
+  return {
+    getById: vi.fn().mockReturnValue(of(MOCK_HERO)),
+    create: vi.fn().mockReturnValue(of(MOCK_HERO)),
+    update: vi.fn().mockReturnValue(of(MOCK_HERO)),
+    isMutating: signal(false).asReadonly(),
+  };
+}
+
 describe('HeroFormComponent', () => {
   let fixture: ComponentFixture<HeroFormComponent>;
   let component: HeroFormComponent;
+  let serviceSpy: ReturnType<typeof makeServiceSpy>;
+  let routerSpy: { navigate: ReturnType<typeof vi.fn> };
+  let snackBarSpy: { open: ReturnType<typeof vi.fn> };
 
-  let heroesServiceSpy: any;
-  let routerSpy: any;
-  let snackBarSpy: any;
+  async function createComponent(heroId: string | null = null): Promise<void> {
+    serviceSpy = makeServiceSpy();
+    routerSpy = { navigate: vi.fn() };
+    snackBarSpy = { open: vi.fn() };
 
-  function createComponent(heroId: string | null = null): void {
-    heroesServiceSpy = {
-      getById: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-    };
-
-    if (heroId) {
-      heroesServiceSpy.getById.mockReturnValue(MOCK_HERO);
-    }
-
-    routerSpy = {
-      navigate: vi.fn(),
-    };
-
-    snackBarSpy = {
-      open: vi.fn(),
-    };
-
-    TestBed.overrideProvider(ActivatedRoute, {
-      useValue: buildRoute(heroId),
-    });
-    TestBed.overrideProvider(HeroesService, {
-      useValue: heroesServiceSpy,
-    });
-    TestBed.overrideProvider(Router, { useValue: routerSpy });
-    TestBed.overrideProvider(MatSnackBar, { useValue: snackBarSpy });
-
-    fixture = TestBed.createComponent(HeroFormComponent);
-    component = fixture.componentInstance;
-
-    fixture.detectChanges();
-  }
-
-  beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [HeroFormComponent],
       providers: [
         provideRouter(routes),
-        { provide: HeroesService, useValue: {} },
-        { provide: Router, useValue: {} },
-        { provide: MatSnackBar, useValue: {} },
-        { provide: ActivatedRoute, useValue: buildRoute(null) },
+        { provide: HeroesService, useValue: serviceSpy },
+        { provide: Router, useValue: routerSpy },
+        { provide: MatSnackBar, useValue: snackBarSpy },
+        { provide: ActivatedRoute, useValue: buildRoute(heroId) },
       ],
     }).compileComponents();
-  });
 
-  // ── Create mode ──────────────────────────────────────────────────────────
+    fixture = TestBed.createComponent(HeroFormComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+  }
+
+  // ── Create mode ───────────────────────────────────────────────────────────
 
   describe('create mode', () => {
     beforeEach(() => createComponent(null));
 
-    it('should create', () => {
-      expect(component).toBeTruthy();
-    });
+    it('should create', () => expect(component).toBeTruthy());
 
     it('should be in create mode', () => {
-      expect(component.isEditMode).toBe(false);
+      expect(component.isEditMode).toBeFalsy();
     });
 
     it('form should start invalid (empty name)', () => {
-      expect(component.heroForm.invalid).toBe(true);
+      expect(component.heroForm.invalid).toBeTruthy();
     });
 
     it('name control should have required error when empty', () => {
       component.nameControl.markAsTouched();
-      expect(component.nameControl.hasError('required')).toBe(true);
+      expect(component.nameControl.hasError('required')).toBeTruthy();
     });
 
     it('name control should have minlength error for 1-char name', () => {
       component.nameControl.setValue('A');
-      component.nameControl.markAsTouched();
-      expect(component.nameControl.hasError('minlength')).toBe(true);
+      expect(component.nameControl.hasError('minlength')).toBeTruthy();
     });
 
     it('alias control should have required error when empty', () => {
       component.aliasControl.markAsTouched();
-      expect(component.aliasControl.hasError('required')).toBe(true);
+      expect(component.aliasControl.hasError('required')).toBeTruthy();
     });
 
     it('power control should have required error when empty', () => {
       component.powerControl.markAsTouched();
-      expect(component.powerControl.hasError('required')).toBe(true);
+      expect(component.powerControl.hasError('required')).toBeTruthy();
     });
 
     it('universe control should default to DC', () => {
@@ -126,34 +105,24 @@ describe('HeroFormComponent', () => {
 
     it('onSubmit() should do nothing when form is invalid', () => {
       component.onSubmit();
-      expect(heroesServiceSpy.create).not.toHaveBeenCalled();
+      expect(serviceSpy.create).not.toHaveBeenCalled();
     });
 
     it('onSubmit() should call create() and navigate when form is valid', () => {
-      heroesServiceSpy.create.mockReturnValue(MOCK_HERO);
-
       component.heroForm.setValue({
         name: 'HULK',
         alias: 'Bruce Banner',
         power: 'Fuerza',
         universe: 'Marvel',
       });
-
       component.onSubmit();
-
-      expect(heroesServiceSpy.create).toHaveBeenCalledWith({
+      expect(serviceSpy.create).toHaveBeenCalledWith({
         name: 'HULK',
         alias: 'Bruce Banner',
         power: 'Fuerza',
         universe: 'Marvel',
       });
-
-      expect(snackBarSpy.open).toHaveBeenCalledWith(
-        'Héroe creado',
-        'Cerrar',
-        { duration: 3000 }
-      );
-
+      expect(snackBarSpy.open).toHaveBeenCalledWith('Héroe creado', 'Cerrar', { duration: 3000 });
       expect(routerSpy.navigate).toHaveBeenCalledWith(['/heroes']);
     });
 
@@ -163,13 +132,13 @@ describe('HeroFormComponent', () => {
     });
   });
 
-  // ── Edit mode ────────────────────────────────────────────────────────────
+  // ── Edit mode ─────────────────────────────────────────────────────────────
 
   describe('edit mode', () => {
     beforeEach(() => createComponent('42'));
 
     it('should be in edit mode', () => {
-      expect(component.isEditMode).toBe(true);
+      expect(component.isEditMode).toBeTruthy();
     });
 
     it('should patch form with hero data', () => {
@@ -178,49 +147,41 @@ describe('HeroFormComponent', () => {
     });
 
     it('onSubmit() should call update() and navigate when form is valid', () => {
-      heroesServiceSpy.update.mockReturnValue(MOCK_HERO);
-
       component.onSubmit();
 
-      expect(heroesServiceSpy.update).toHaveBeenCalledWith(
+      // ✅ Vitest usa expect.objectContaining, no jasmine.objectContaining
+      expect(serviceSpy.update).toHaveBeenCalledWith(
         '42',
         expect.objectContaining({ name: MOCK_HERO.name })
       );
-
-      expect(snackBarSpy.open).toHaveBeenCalledWith(
-        'Héroe actualizado',
-        'Cerrar',
-        { duration: 3000 }
-      );
-
+      expect(snackBarSpy.open).toHaveBeenCalledWith('Héroe actualizado', 'Cerrar', { duration: 3000 });
       expect(routerSpy.navigate).toHaveBeenCalledWith(['/heroes']);
     });
   });
 
-  // ── Hero not found ───────────────────────────────────────────────────────
+  // ── Hero not found ────────────────────────────────────────────────────────
 
   describe('edit mode – hero not found', () => {
-    it('should redirect to /heroes when hero id is not found', () => {
-      heroesServiceSpy = {
-        getById: vi.fn().mockReturnValue(undefined),
-        create: vi.fn(),
-        update: vi.fn(),
-      };
-
+    it('should redirect to /heroes when hero id is not found', async () => {
+      serviceSpy = makeServiceSpy();
+      serviceSpy.getById.mockReturnValue(of(undefined));
       routerSpy = { navigate: vi.fn() };
       snackBarSpy = { open: vi.fn() };
 
-      TestBed.overrideProvider(ActivatedRoute, {
-        useValue: buildRoute('nonexistent'),
-      });
-      TestBed.overrideProvider(HeroesService, {
-        useValue: heroesServiceSpy,
-      });
-      TestBed.overrideProvider(Router, { useValue: routerSpy });
-      TestBed.overrideProvider(MatSnackBar, { useValue: snackBarSpy });
+      await TestBed.configureTestingModule({
+        imports: [HeroFormComponent],
+        providers: [
+          provideRouter(routes),
+          { provide: HeroesService, useValue: serviceSpy },
+          { provide: Router, useValue: routerSpy },
+          { provide: MatSnackBar, useValue: snackBarSpy },
+          { provide: ActivatedRoute, useValue: buildRoute('nonexistent') },
+        ],
+      }).compileComponents();
 
       fixture = TestBed.createComponent(HeroFormComponent);
       fixture.detectChanges();
+      await fixture.whenStable();
 
       expect(routerSpy.navigate).toHaveBeenCalledWith(['/heroes']);
     });

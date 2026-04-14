@@ -5,6 +5,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 import { routes } from './app.routes';
 import { AppComponent } from './app.component';
+import { HeroRepository } from './core/heroes/hero.repository';
+import { HeroInMemoryRepository } from './core/heroes/hero-in-memory.repository';
 
 describe('app.routes', () => {
   let router: Router;
@@ -15,6 +17,7 @@ describe('app.routes', () => {
       imports: [AppComponent],
       providers: [
         provideRouter(routes),
+        { provide: HeroRepository, useClass: HeroInMemoryRepository },
       ],
     }).compileComponents();
 
@@ -53,7 +56,7 @@ describe('app.routes', () => {
     expect(location.path()).toBe('/heroes');
   });
 
-  // ── Estructura estática del array de rutas ────────────────────────────────
+  // ── Estructura estática ───────────────────────────────────────────────────
 
   it('routes array should have 5 entries', () => {
     expect(routes.length).toBe(5);
