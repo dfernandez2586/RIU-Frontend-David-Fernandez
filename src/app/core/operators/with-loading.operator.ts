@@ -1,6 +1,6 @@
 import { Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
-import { LoadingService } from '../interceptors/loading.service';
+import { LoadingService } from '../services/loading.service';
 
 export function withLoading<T>(loadingService: LoadingService) {
   return (source: Observable<T>): Observable<T> => {

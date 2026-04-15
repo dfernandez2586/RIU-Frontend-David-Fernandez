@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Component } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { By } from '@angular/platform-browser';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 
 import { UppercaseDirective } from './uppercase.directive';
 
@@ -15,11 +15,28 @@ class TestHostComponent {
   nameControl = new FormControl('');
 }
 
+@Component({
+  standalone: true,
+  imports: [UppercaseDirective, ReactiveFormsModule],
+  template: `<input appUppercase [formControl]="nameControl" />`,
+})
+class TestHostWithValueComponent {
+  nameControl = new FormControl('superman');
+}
+
+@Component({
+  standalone: true,
+  imports: [UppercaseDirective, ReactiveFormsModule],
+  template: `<input appUppercase [formControl]="nameControl" />`,
+})
+class TestHostAlreadyUpperComponent {
+  nameControl = new FormControl('BATMAN');
+}
+
 describe('UppercaseDirective', () => {
   let fixture: ComponentFixture<TestHostComponent>;
   let inputEl: HTMLInputElement;
   let component: TestHostComponent;
-  let directive: UppercaseDirective;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -30,16 +47,16 @@ describe('UppercaseDirective', () => {
     component = fixture.componentInstance;
     fixture.detectChanges();
     inputEl = fixture.debugElement.query(By.css('input')).nativeElement;
-    directive = fixture.debugElement
-      .query(By.directive(UppercaseDirective))
-      .injector.get(UppercaseDirective);
   });
 
   it('should be created', () => {
+    const directive = fixture.debugElement
+      .query(By.directive(UppercaseDirective))
+      .injector.get(UppercaseDirective);
     expect(directive).toBeTruthy();
   });
 
-  it('should convert typed text to uppercase', () => {
+  it('should convert typed text to uppercase on input event', () => {
     inputEl.value = 'spiderman';
     inputEl.dispatchEvent(new Event('input'));
     fixture.detectChanges();
@@ -53,51 +70,50 @@ describe('UppercaseDirective', () => {
     expect(component.nameControl.value).toBe('BATMAN');
   });
 
-  it('writeValue() should set input value in uppercase', () => {
-    component.nameControl.setValue('superman');
-    fixture.detectChanges();
-    expect(inputEl.value).toBe('SUPERMAN');
-  });
-
-  it('writeValue() with null/empty should set empty string', () => {
-    component.nameControl.setValue(null);
-    fixture.detectChanges();
-    expect(inputEl.value).toBe('');
-  });
-
-  it('should mark control as touched on blur', () => {
-    expect(component.nameControl.touched).toBeFalsy();
-    inputEl.dispatchEvent(new Event('blur'));
-    fixture.detectChanges();
-    expect(component.nameControl.touched).toBeTruthy();
-  });
-
-  it('setDisabledState() should disable the input', () => {
-    component.nameControl.disable();
-    fixture.detectChanges();
-    expect(inputEl.disabled).toBeTruthy();
-  });
-
-  it('setDisabledState() should re-enable the input', () => {
-    component.nameControl.disable();
-    fixture.detectChanges();
-    component.nameControl.enable();
-    fixture.detectChanges();
-    expect(inputEl.disabled).toBeFalsy();
-  });
-
-  it('registerOnChange() should store and call the provided function', () => {
-    const fn = vi.fn();
-    directive.registerOnChange(fn);
-    inputEl.value = 'hulk';
+  it('should not call setValue again if value is already uppercase', () => {
+    inputEl.value = 'HULK';
     inputEl.dispatchEvent(new Event('input'));
-    expect(fn).toHaveBeenCalledWith('HULK');
+    fixture.detectChanges();
+    expect(component.nameControl.value).toBe('HULK');
+    expect(inputEl.value).toBe('HULK');
   });
 
-  it('registerOnTouched() should store and call the provided function', () => {
-    const fn = vi.fn();
-    directive.registerOnTouched(fn);
-    inputEl.dispatchEvent(new Event('blur'));
-    expect(fn).toHaveBeenCalled();
+  it('should convert initial value to uppercase on init', async () => {
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [TestHostWithValueComponent],
+    }).compileComponents();
+
+    const f = TestBed.createComponent(TestHostWithValueComponent);
+    f.detectChanges();
+
+    const input: HTMLInputElement = f.debugElement.query(By.css('input')).nativeElement;
+    expect(f.componentInstance.nameControl.value).toBe('SUPERMAN');
+    expect(input.value).toBe('SUPERMAN');
+  });
+
+  it('should not patch value on init if already uppercase', async () => {
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [TestHostAlreadyUpperComponent],
+    }).compileComponents();
+
+    const f = TestBed.createComponent(TestHostAlreadyUpperComponent);
+    f.detectChanges();
+    expect(f.componentInstance.nameControl.value).toBe('BATMAN');
+  });
+
+  it('should handle null/empty NgControl gracefully', () => {
+    inputEl.value = '';
+    expect(() => inputEl.dispatchEvent(new Event('input'))).not.toThrow();
+  });
+
+  it('should preserve cursor position after uppercasing', () => {
+    inputEl.value = 'abc';
+    inputEl.setSelectionRange(1, 2);
+    inputEl.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(inputEl.selectionStart).toBe(1);
+    expect(inputEl.selectionEnd).toBe(2);
   });
 });

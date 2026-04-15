@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SpinnerComponent } from './spinner.component';
-import { LoadingService } from '../../../core/interceptors/loading.service';
+import { LoadingService } from '../../../core/services/loading.service';
 
 describe('SpinnerComponent', () => {
   let fixture: ComponentFixture<SpinnerComponent>;

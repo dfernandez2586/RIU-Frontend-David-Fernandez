@@ -2,9 +2,9 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 import { Observable, tap, finalize, catchError, throwError } from 'rxjs';
 
 import { HeroRepository } from '../../../../core/heroes/hero.repository';
-import { LoadingService } from '../../../../core/interceptors/loading.service';
 import { withLoading } from '../../../../core/operators/with-loading.operator';
 import { CreateHeroDto, Hero, UpdateHeroDto } from '../../models/hero.model';
+import { LoadingService } from '../../../../core/services/loading.service';
 
 export type OperationState = 'idle' | 'loading' | 'error';
 
@@ -15,6 +15,10 @@ export interface HeroesState {
   mutationState: OperationState;
   error: string | null;
   cacheValid: boolean;
+
+  searchQuery: string;
+  pageIndex: number;
+  pageSize: number;
 }
 
 const INITIAL_STATE: HeroesState = {
@@ -23,7 +27,10 @@ const INITIAL_STATE: HeroesState = {
   listState: 'idle',
   mutationState: 'idle',
   error: null,
-  cacheValid: false,
+  cacheValid: false,  
+  searchQuery: '',
+  pageIndex: 0,
+  pageSize: 10,
 };
 
 @Injectable({ providedIn: 'root' })
@@ -45,6 +52,10 @@ export class HeroesService {
   readonly isLoading = computed(() => this.isListLoading() || this.isMutating());
   readonly heroCount = computed(() => this._state().heroes.length);
 
+  readonly searchQuery = computed(() => this._state().searchQuery);
+  readonly pageIndex = computed(() => this._state().pageIndex);
+  readonly pageSize = computed(() => this._state().pageSize);
+
   // ── READ ──────────────────────────────────────────────────────────────────
 
   loadAll(force = false): void {
@@ -56,7 +67,6 @@ export class HeroesService {
       .getAll()
       .pipe(
         withLoading(this._loadingService),
-        // El finalize es la única fuente de reset a 'idle' (safety net)
         finalize(() => {
           if (this._state().listState === 'loading') {
             this._patchState({ listState: 'idle' });
@@ -64,9 +74,18 @@ export class HeroesService {
         })
       )
       .subscribe({
-        next: (heroes) =>
-          // Sin listState: 'idle' — lo setea el finalize tras el next
-          this._patchState({ heroes, filteredHeroes: heroes, cacheValid: true }),
+        next: (heroes) => {
+          const q = this._state().searchQuery;
+          const filtered = q
+            ? heroes.filter((h) => h.name.toLowerCase().includes(q.toLowerCase()))
+            : heroes;
+          this._patchState({
+            heroes,
+            filteredHeroes: filtered,
+            cacheValid: true,
+            listState: 'idle',
+          });
+        },
         error: (err) =>
           this._patchState({ listState: 'error', error: this._extractMessage(err) }),
       });
@@ -75,11 +94,27 @@ export class HeroesService {
   searchByName(query: string): void {
     const q = query.trim();
 
+    this._patchState({ searchQuery: q, pageIndex: 0 });
+
     if (!q) {
+      if (this._state().cacheValid) {
+        this._patchState({ filteredHeroes: this._state().heroes });
+        return;
+      }
       this.loadAll(true);
       return;
     }
 
+    // filtrar en memoria si hay cache
+    if (this._state().cacheValid) {
+      const filtered = this._state().heroes.filter((h) =>
+        h.name.toLowerCase().includes(q.toLowerCase())
+      );
+      this._patchState({ filteredHeroes: filtered });
+      return;
+    }
+
+    // delegar al repo (se usa cuando la caché aún no está completa)
     this._patchState({ listState: 'loading', error: null });
 
     this._repo
@@ -94,8 +129,7 @@ export class HeroesService {
       )
       .subscribe({
         next: (filteredHeroes) =>
-          // Sin listState: 'idle' — lo setea el finalize tras el next
-          this._patchState({ filteredHeroes, cacheValid: false }),
+          this._patchState({ filteredHeroes, listState: 'idle' }),
         error: (err) =>
           this._patchState({ listState: 'error', error: this._extractMessage(err) }),
       });
@@ -112,21 +146,29 @@ export class HeroesService {
     return this._repo.getById(id).pipe(withLoading(this._loadingService));
   }
 
-  // ── WRITE ─────────────────────────────────────────────────────────────────
+  // ── Persistent UI state ───────────────────────────────────────────────────
+
+  setPageIndex(index: number): void {
+    this._patchState({ pageIndex: index });
+  }
+
+  setPageSize(size: number): void {
+    this._patchState({ pageSize: size });
+  }
 
   create(dto: CreateHeroDto): Observable<Hero> {
     this._patchState({ mutationState: 'loading', error: null });
 
     return this._repo.create(dto).pipe(
       withLoading(this._loadingService),
-      tap((hero) =>
-        // Sin mutationState: 'idle' — lo setea el finalize
-        this._patchState({
-          heroes: [...this._state().heroes, hero],
-          filteredHeroes: [...this._state().filteredHeroes, hero],
-          cacheValid: false,
-        })
-      ),
+      tap((hero) => {
+        const q = this._state().searchQuery.toLowerCase();
+        const heroes = [...this._state().heroes, hero];
+        const filteredHeroes = q
+          ? [...this._state().filteredHeroes, ...(hero.name.toLowerCase().includes(q) ? [hero] : [])]
+          : [...this._state().filteredHeroes, hero];
+        this._patchState({ heroes, filteredHeroes, mutationState: 'idle' });
+      }),
       catchError((err) => {
         this._patchState({ mutationState: 'error', error: this._extractMessage(err) });
         return throwError(() => err);
@@ -146,11 +188,10 @@ export class HeroesService {
       withLoading(this._loadingService),
       tap((updated) => {
         const replaceFn = (h: Hero) => (h.id === id ? updated : h);
-        // Sin mutationState: 'idle' — lo setea el finalize
         this._patchState({
           heroes: this._state().heroes.map(replaceFn),
           filteredHeroes: this._state().filteredHeroes.map(replaceFn),
-          cacheValid: false,
+          mutationState: 'idle',
         });
       }),
       catchError((err) => {
@@ -172,11 +213,10 @@ export class HeroesService {
       withLoading(this._loadingService),
       tap(() => {
         const filterFn = (h: Hero) => h.id !== id;
-        // Sin mutationState: 'idle' — lo setea el finalize
         this._patchState({
           heroes: this._state().heroes.filter(filterFn),
           filteredHeroes: this._state().filteredHeroes.filter(filterFn),
-          cacheValid: false,
+          mutationState: 'idle',
         });
       }),
       catchError((err) => {

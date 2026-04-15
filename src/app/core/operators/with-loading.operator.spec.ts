@@ -3,7 +3,7 @@ import { of, throwError, Subject } from 'rxjs';
 import { describe, it, expect, beforeEach } from 'vitest';
 
 import { withLoading } from './with-loading.operator';
-import { LoadingService } from '../interceptors/loading.service';
+import { LoadingService } from '../services/loading.service';
 
 describe('withLoading operator', () => {
   let loadingService: LoadingService;

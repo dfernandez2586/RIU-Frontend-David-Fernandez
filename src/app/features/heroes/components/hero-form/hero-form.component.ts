@@ -1,11 +1,11 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   FormBuilder,
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -39,6 +39,7 @@ export class HeroFormComponent implements OnInit {
   private readonly _route = inject(ActivatedRoute);
   private readonly _router = inject(Router);
   private readonly _snackBar = inject(MatSnackBar);
+  private readonly _destroyRef = inject(DestroyRef);
 
   readonly universes: Hero['universe'][] = ['Marvel', 'DC', 'Other'];
   isEditMode = false;
@@ -62,18 +63,21 @@ export class HeroFormComponent implements OnInit {
 
     this.isEditMode = true;
 
-    this.heroesService.getById(this._heroId).subscribe((hero) => {
-      if (!hero) {
-        this._router.navigate(['/heroes']);
-        return;
-      }
-      this.heroForm.patchValue({
-        name: hero.name,
-        alias: hero.alias,
-        power: hero.power,
-        universe: hero.universe,
+    this.heroesService
+      .getById(this._heroId)
+      .pipe(takeUntilDestroyed(this._destroyRef))
+      .subscribe((hero) => {
+        if (!hero) {
+          this._router.navigate(['/heroes']);
+          return;
+        }
+        this.heroForm.patchValue({
+          name: hero.name,
+          alias: hero.alias,
+          power: hero.power,
+          universe: hero.universe,
+        });
       });
-    });
   }
 
   onSubmit(): void {
@@ -84,6 +88,7 @@ export class HeroFormComponent implements OnInit {
     if (this.isEditMode && this._heroId) {
       this.heroesService
         .update(this._heroId, { name, alias, power, universe })
+        .pipe(takeUntilDestroyed(this._destroyRef))
         .subscribe(() => {
           this._snackBar.open('Héroe actualizado', 'Cerrar', { duration: 3000 });
           this._router.navigate(['/heroes']);
@@ -91,6 +96,7 @@ export class HeroFormComponent implements OnInit {
     } else {
       this.heroesService
         .create({ name, alias, power, universe })
+        .pipe(takeUntilDestroyed(this._destroyRef))
         .subscribe(() => {
           this._snackBar.open('Héroe creado', 'Cerrar', { duration: 3000 });
           this._router.navigate(['/heroes']);

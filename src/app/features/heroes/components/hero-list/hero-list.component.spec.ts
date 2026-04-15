@@ -13,7 +13,7 @@ import { Hero } from '../../models/hero.model';
 import { routes } from '../../../../app.routes';
 import { HeroesService } from '../../services/heroes/heroes.service';
 
-const MOCK_HEROES: Hero[] = Array.from({ length: 10 }, (_, i) => ({
+const MOCK_HEROES: Hero[] = Array.from({ length: 20 }, (_, i) => ({
   id: String(i + 1),
   name: i % 2 === 0 ? `SUPERMAN ${i}` : `BATMAN ${i}`,
   alias: `Alias ${i}`,
@@ -26,6 +26,9 @@ function makeServiceSpy() {
   const _filteredHeroes = signal<Hero[]>(MOCK_HEROES);
   const _error = signal<string | null>(null);
   const _isListLoading = signal(false);
+  const _pageIndex = signal(0);
+  const _pageSize = signal(8);
+  const _searchQuery = signal('');
 
   return {
     filteredHeroes: _filteredHeroes.asReadonly(),
@@ -33,12 +36,21 @@ function makeServiceSpy() {
     isListLoading: _isListLoading.asReadonly(),
     isMutating: signal(false).asReadonly(),
     isLoading: signal(false).asReadonly(),
+    pageIndex: _pageIndex.asReadonly(),
+    pageSize: _pageSize.asReadonly(),
+    searchQuery: _searchQuery.asReadonly(),
+    
     loadAll: vi.fn(),
     searchByName: vi.fn(),
+    setPageIndex: vi.fn((val: number) => _pageIndex.set(val)),
+    setPageSize: vi.fn((val: number) => _pageSize.set(val)),
     delete: vi.fn().mockReturnValue(of(undefined)),
+    
     _filteredHeroes,
     _error,
     _isListLoading,
+    _pageIndex,
+    _pageSize
   };
 }
 
@@ -73,8 +85,6 @@ describe('HeroListComponent', () => {
     await fixture.whenStable();
   });
 
-  // ── Bootstrap ─────────────────────────────────────────────────────────────
-
   it('should create', () => {
     expect(component).toBeTruthy();
   });
@@ -87,7 +97,7 @@ describe('HeroListComponent', () => {
 
   it('should render up to PAGE_SIZE hero cards', () => {
     const cards = fixture.debugElement.queryAll(By.css('app-hero-card'));
-    expect(cards.length).toBeLessThanOrEqual(component.pageSize);
+    expect(cards.length).toBeLessThanOrEqual(serviceSpy.pageSize());
   });
 
   it('should show paginator when there are heroes', () => {
@@ -133,15 +143,13 @@ describe('HeroListComponent', () => {
 
   // ── Filter ────────────────────────────────────────────────────────────────
 
-  it('should call searchByName() and reset page after debounce', async () => {
+  it('should call searchByName() after debounce', async () => {
     component.filterControl.setValue('superman');
     await new Promise((r) => setTimeout(r, 350));
-
     expect(serviceSpy.searchByName).toHaveBeenCalledWith('superman');
-    expect(component.pageIndex()).toBe(0);
   });
 
-  it('should NOT call searchByName() before debounce elapses', async () => {
+    it('should NOT call searchByName() before debounce elapses', async () => {
     component.filterControl.setValue('bat');
     await new Promise((r) => setTimeout(r, 100));
     expect(serviceSpy.searchByName).not.toHaveBeenCalled();
@@ -155,22 +163,20 @@ describe('HeroListComponent', () => {
 
   // ── Pagination ────────────────────────────────────────────────────────────
 
-  it('onPageChange() should update pageIndex and currentPageSize', () => {
-    component.onPageChange({ pageIndex: 1, pageSize: 8, length: 10 } as any);
-    expect(component.pageIndex()).toBe(1);
-    expect(component.currentPageSize()).toBe(8);
+  it('onPageChange() should call service setPageIndex and setPageSize', () => {
+    component.onPageChange({ pageIndex: 1, pageSize: 5, length: 20 } as any);
+    expect(serviceSpy.setPageIndex).toHaveBeenCalledWith(1);
+    expect(serviceSpy.setPageSize).toHaveBeenCalledWith(5);
   });
 
-  it('pagedHeroes() should return correct slice for page 1', () => {
-    component.pageIndex.set(1);
+  it('pagedHeroes() should return correct slice based on service state', () => {
+    serviceSpy._pageIndex.set(1);
+    serviceSpy._pageSize.set(8);
+    
+    fixture.detectChanges();
+    
     const paged = component.pagedHeroes();
-    expect(paged.length).toBeLessThanOrEqual(component.pageSize);
-    expect(paged[0]).toEqual(MOCK_HEROES[component.pageSize]);
-  });
-
-  it('pagedHeroes() should return first page by default', () => {
-    const paged = component.pagedHeroes();
-    expect(paged[0]).toEqual(MOCK_HEROES[0]);
+    expect(paged[0]).toEqual(MOCK_HEROES[8]);
   });
 
   // ── Navigation ────────────────────────────────────────────────────────────
@@ -179,23 +185,25 @@ describe('HeroListComponent', () => {
     component.navigateToNew();
     expect(routerSpy.navigate).toHaveBeenCalledWith(['/heroes/new']);
   });
-
-  it('navigateToEdit() should navigate to /heroes/:id', () => {
+  
+    it('navigateToEdit() should navigate to /heroes/:id', () => {
     component.navigateToEdit(MOCK_HEROES[0]);
     expect(routerSpy.navigate).toHaveBeenCalledWith(['/heroes', MOCK_HEROES[0].id]);
   });
-
   // ── Delete dialog ─────────────────────────────────────────────────────────
-
-  it('openDeleteDialog() should open ConfirmDialogComponent', () => {
+  
+    it('openDeleteDialog() should open ConfirmDialogComponent', () => {
     dialogSpy.open.mockReturnValue({ afterClosed: () => of(false) } as MatDialogRef<any>);
     component.openDeleteDialog(MOCK_HEROES[0]);
     expect(dialogSpy.open).toHaveBeenCalled();
   });
-
   it('should call delete() and show snackbar when confirmed', () => {
-    dialogSpy.open.mockReturnValue({ afterClosed: () => of(true) } as MatDialogRef<any>);
+    dialogSpy.open.mockReturnValue({ 
+      afterClosed: () => of(true) 
+    } as MatDialogRef<any>);
+    
     component.openDeleteDialog(MOCK_HEROES[0]);
+    
     expect(serviceSpy.delete).toHaveBeenCalledWith(MOCK_HEROES[0].id);
     expect(snackBarSpy.open).toHaveBeenCalledWith(
       `${MOCK_HEROES[0].name} eliminado`,
@@ -204,7 +212,7 @@ describe('HeroListComponent', () => {
     );
   });
 
-  it('should NOT call delete() when dialog is cancelled', () => {
+    it('should NOT call delete() when dialog is cancelled', () => {
     dialogSpy.open.mockReturnValue({ afterClosed: () => of(false) } as MatDialogRef<any>);
     component.openDeleteDialog(MOCK_HEROES[0]);
     expect(serviceSpy.delete).not.toHaveBeenCalled();

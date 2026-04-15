@@ -2,7 +2,6 @@ import {
   Component,
   computed,
   inject,
-  signal,
   OnInit,
   DestroyRef,
 } from '@angular/core';
@@ -27,9 +26,6 @@ import {
 } from '../confirm-dialog/confirm-dialog.component';
 import { HeroesService } from '../../services/heroes/heroes.service';
 
-const PAGE_SIZE = 10;
-const INITIAL_LOAD_DELAY_MS = 800;
-
 @Component({
   selector: 'app-hero-list',
   standalone: true,
@@ -53,20 +49,29 @@ export class HeroListComponent implements OnInit {
   private readonly _snackBar = inject(MatSnackBar);
   private readonly _destroyRef = inject(DestroyRef);
 
+  // filterControl se inicializa con el valor persistido en el servicio
   readonly filterControl = new FormControl('', { nonNullable: true });
-  readonly pageIndex = signal(0);
-  readonly currentPageSize = signal(PAGE_SIZE);
 
-  get pageSize() { return PAGE_SIZE; }
+  get pageSize(): number {
+    return this.heroesService.pageSize();
+  }
 
   readonly pagedHeroes = computed(() => {
-    const start = this.pageIndex() * this.currentPageSize();
-    return this.heroesService.filteredHeroes().slice(start, start + this.currentPageSize());
+    const start = this.heroesService.pageIndex() * this.heroesService.pageSize();
+    return this.heroesService.filteredHeroes().slice(start, start + this.heroesService.pageSize());
   });
 
   ngOnInit(): void {
+    // Restaurar filtro persistido sin disparar debounce
+    const savedQuery = this.heroesService.searchQuery();
+    if (savedQuery) {
+      this.filterControl.setValue(savedQuery, { emitEvent: false });
+    }
+
+    // Cargar datos solo si la cache no es válida
     this.heroesService.loadAll();
 
+    // Filtro con debounce — persiste en el servicio
     this.filterControl.valueChanges
       .pipe(
         debounceTime(300),
@@ -75,7 +80,6 @@ export class HeroListComponent implements OnInit {
       )
       .subscribe((value) => {
         this.heroesService.searchByName(value);
-        this.pageIndex.set(0);
       });
   }
 
@@ -84,8 +88,8 @@ export class HeroListComponent implements OnInit {
   }
 
   onPageChange(event: PageEvent): void {
-    this.pageIndex.set(event.pageIndex);
-    this.currentPageSize.set(event.pageSize);
+    this.heroesService.setPageIndex(event.pageIndex);
+    this.heroesService.setPageSize(event.pageSize);
   }
 
   navigateToNew(): void {
@@ -108,9 +112,11 @@ export class HeroListComponent implements OnInit {
       .pipe(takeUntilDestroyed(this._destroyRef))
       .subscribe((confirmed: boolean) => {
         if (!confirmed) return;
-        this.heroesService.delete(hero.id).subscribe(() => {
-          this._snackBar.open(`${hero.name} eliminado`, 'Cerrar', { duration: 3000 });
-        });
+        this.heroesService.delete(hero.id)
+          .pipe(takeUntilDestroyed(this._destroyRef))
+          .subscribe(() => {
+            this._snackBar.open(`${hero.name} eliminado`, 'Cerrar', { duration: 3000 });
+          });
       });
   }
 }

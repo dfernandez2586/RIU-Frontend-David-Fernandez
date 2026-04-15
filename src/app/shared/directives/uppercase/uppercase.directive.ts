@@ -1,55 +1,37 @@
-import {
-  Directive,
-  HostListener,
-  ElementRef,
-  inject,
-  forwardRef,
-} from '@angular/core';
-import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { Directive, HostListener, inject, OnInit, DestroyRef } from '@angular/core';
+import { NgControl } from '@angular/forms';
+
 
 @Directive({
   selector: 'input[appUppercase]',
   standalone: true,
-  providers: [
-    {
-      provide: NG_VALUE_ACCESSOR,
-      useExisting: forwardRef(() => UppercaseDirective),
-      multi: true,
-    },
-  ],
 })
-export class UppercaseDirective implements ControlValueAccessor {
-  private readonly _el = inject(ElementRef);
+export class UppercaseDirective implements OnInit {
+  private readonly _control = inject(NgControl, { self: true, optional: true });
 
-  private _onChange: (value: string) => void = () => {};
-  private _onTouched: () => void = () => {};
+  ngOnInit(): void {
+    if (!this._control?.control) return;
 
-  @HostListener('input', ['$event'])
-  onInput(event: Event): void {
-    const input = event.target as HTMLInputElement;
+    const current = this._control.control.value;
+    if (typeof current === 'string' && current !== current.toUpperCase()) {
+      this._control.control.setValue(current.toUpperCase(), { emitEvent: false });
+    }
+  }
+
+  @HostListener('input', ['$event.target'])
+  onInput(target: EventTarget | null): void {
+    if (!this._control?.control || !(target instanceof HTMLInputElement)) return;
+
+    const input = target;
+
     const upper = input.value.toUpperCase();
-    input.value = upper;
-    this._onChange(upper);
-  }
+    if (input.value !== upper) {
+      const start = input.selectionStart ?? upper.length;
+      const end = input.selectionEnd ?? upper.length;
+      input.value = upper;
+      input.setSelectionRange(start, end);
+    }
 
-  @HostListener('blur')
-  onBlur(): void {
-    this._onTouched();
-  }
-
-  writeValue(value: string): void {
-    this._el.nativeElement.value = value ? value.toUpperCase() : '';
-  }
-
-  registerOnChange(fn: (value: string) => void): void {
-    this._onChange = fn;
-  }
-
-  registerOnTouched(fn: () => void): void {
-    this._onTouched = fn;
-  }
-
-  setDisabledState(isDisabled: boolean): void {
-    this._el.nativeElement.disabled = isDisabled;
+    this._control.control.setValue(upper, { emitEvent: true });
   }
 }

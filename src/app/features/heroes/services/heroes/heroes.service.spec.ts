@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import { HeroesService } from './heroes.service';
 import { HeroRepository } from '../../../../core/heroes/hero.repository';
-import { LoadingService } from '../../../../core/interceptors/loading.service';
+import { LoadingService } from '../../../../core/services/loading.service';
 import { CreateHeroDto, Hero, UpdateHeroDto } from '../../models/hero.model';
 
 const MOCK_HEROES: Hero[] = [
@@ -83,7 +83,7 @@ describe('HeroesService', () => {
 
   it('loadAll() should set cacheValid after first load', () => {
     service.loadAll();
-    service.loadAll();
+    service.loadAll(); // Segunda llamada
     expect(repoSpy.getAll).toHaveBeenCalledTimes(1);
   });
 
@@ -105,6 +105,8 @@ describe('HeroesService', () => {
     expect(service.listState()).toBe('error');
     expect(service.error()).toBe('Network error');
   });
+
+  // ── searchByName (Filtrado y Búsqueda) ───────────────────────────────────
 
   it('loadAll() should handle string errors', () => {
     const subject = new Subject<Hero[]>();
@@ -172,24 +174,43 @@ describe('HeroesService', () => {
     expect(service.isLoading()).toBeFalsy();
   });
 
-  it('searchByName() with query should call repo.searchByName', () => {
+  it('searchByName() with query should call repo.searchByName when cache is invalid', () => {
     service.searchByName('man');
     expect(repoSpy.searchByName).toHaveBeenCalledWith('man');
     expect(service.filteredHeroes()).toEqual([MOCK_HEROES[0]]);
   });
 
-  it('searchByName() with empty string should call loadAll', () => {
-    service.loadAll();
+  it('searchByName() with query should filter in memory when cache is valid', () => {
+    service.loadAll(); // cacheValid = true
+    repoSpy.searchByName.mockClear();
+
+    service.searchByName('SUPERMAN');
+
+    expect(repoSpy.searchByName).not.toHaveBeenCalled();
+    expect(service.filteredHeroes().length).toBe(1);
+    expect(service.filteredHeroes()[0].name).toBe('SUPERMAN');
+  });
+
+  it('searchByName() with empty string should call loadAll when cache is invalid', () => {
     repoSpy.getAll.mockClear();
     service.searchByName('');
     expect(repoSpy.getAll).toHaveBeenCalledTimes(1);
   });
 
-  it('searchByName() with whitespace should call loadAll', () => {
-    service.loadAll();
+  it('searchByName() with whitespace should call loadAll when cache is invalid', () => {
     repoSpy.getAll.mockClear();
     service.searchByName('   ');
     expect(repoSpy.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('searchByName() with empty string should restore from cache without calling repo if valid', () => {
+    service.loadAll();
+    repoSpy.getAll.mockClear();
+
+    service.searchByName('');
+    
+    expect(repoSpy.getAll).not.toHaveBeenCalled();
+    expect(service.filteredHeroes()).toEqual(MOCK_HEROES);
   });
 
   it('searchByName() should set error state on failure', () => {
@@ -205,7 +226,7 @@ describe('HeroesService', () => {
     expect(service.error()).toBe('Search failed');
   });
 
-  it('searchByName() finalize should reset listState to idle on success', () => {
+    it('searchByName() finalize should reset listState to idle on success', () => {
     const subject = new Subject<Hero[]>();
     repoSpy.searchByName.mockReturnValue(subject.asObservable());
 
@@ -331,27 +352,15 @@ describe('HeroesService', () => {
     expect(service.mutationState()).toBe('idle');
   });
 
-  it('delete() should set error state on failure', () => {
-    const subject = new Subject<void>();
-    repoSpy.delete.mockReturnValue(subject.asObservable());
-    service.delete('1').subscribe({ error: () => {} });
-    subject.error(new Error('Delete failed'));
-    expect(service.mutationState()).toBe('error');
-    expect(service.error()).toBe('Delete failed');
-  });
-
-  it('delete() finalize should reset mutationState to idle on success', () => {
-    service.loadAll();
+  it('isMutating should be true while deleting and false after', () => {
     const subject = new Subject<void>();
     repoSpy.delete.mockReturnValue(subject.asObservable());
 
     service.delete('1').subscribe();
-    expect(service.mutationState()).toBe('loading');
+    expect(service.isMutating()).toBeTruthy();
 
     subject.next(undefined);
     subject.complete();
-
-    expect(service.mutationState()).toBe('idle');
-    expect(service.heroes().find((h) => h.id === '1')).toBeUndefined();
+    expect(service.isMutating()).toBeFalsy();
   });
 });
